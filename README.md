@@ -1,1 +1,6 @@
 # antColonyCUDA
+
+Desenvolvido para a disciplina de Tópicos Especiais em Programação de Computadores do curso de Ciência da Computação da UFRRJ, este trabalho apresenta uma versão paralelizada do **Algoritmo de Colônia de Formigas** (ACO) aplicado ao **Problema do Caixeiro Viajante** (TSP) utilizando GPU (Graphics Processing Units). A implementação aqui encontrada foi desenvolvida na plataforma de programação **CUDA** (Compute Unified Device Architecture), presente em grande parte dos processadores gráficos NVIDIA. Aqui encontram-se, além do código paralelizado, uma [implementação sequencial do algoritmo](https://github.com/rodolphorosa/antColonyCUDA/blob/master/sequential_aco.cpp), um conjunto de [instâncias](https://github.com/rodolphorosa/antColonyCUDA/tree/master/dataset) e um [validador](https://github.com/rodolphorosa/antColonyCUDA/blob/master/results/validator.py), que analisa a corretude da solução encontrada. 
+
+
+This work presents a parallel version of the Ant Colony Optization Algorithm (ACO) applied to the Travelling Salesman Problem (TSP) utilizing GPU. The implementation found in here was developed in CUDA programming platform, present in most of the NVIDIA graphics processors. 
