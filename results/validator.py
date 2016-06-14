@@ -12,6 +12,8 @@ def main(inputname):
 			cities[int(line)] += 1 
 		except:
 			cities[int(line)] = 1 
+
+	pprint(cities)
 	
 	for city in cities.keys():
 		if cities[city] > 1:

@@ -12,12 +12,22 @@
 
 	Retorna um numero (double) aleatorio entre 0.0f e 1.0f. 
 	
-	Parametros: 
-	
+	Parametros: 	
 	Saida:
 		numero aleaorio entre 0.0 e 1.0.
 */
 #define randdouble() ((double)rand()/(double)RAND_MAX) 
+
+/*
+	randomize()
+
+	Atualiza o gerador de numeros pseudo-aletatorios. 
+
+	Parametros: 
+	Saida:		
+*/
+
+#define randomize() srand((unsigned)time(NULL))
 
 /* 
 	index()
@@ -36,8 +46,8 @@
 
 using namespace std;
 
-const int NUMBER_OF_ITERATIONS = 100;
-const double INIT_PHEROMONE_AMOUNT = 100.0;
+const int NUMBER_OF_ITERATIONS = 50;
+const double INIT_PHEROMONE_AMOUNT = 1.0;
 const double EVAPORATION_RATE = 0.5;
 const double ALFA = 1; /* Influencia da trilha de feromonios */
 const double BETA = 2; /* Influencia da informacao heuristica */
@@ -159,7 +169,7 @@ void construct_tour ( int *distances, double *pheromones, double *choiceinfo, in
 int *run ( int *distances, int n_cities, int n_ants);
 
 int main ( int argc, char *argv[] ) {
-	srand(time(NULL));
+	randomize();
 
 	char const *inputname, *outputname;
 
@@ -184,7 +194,7 @@ int main ( int argc, char *argv[] ) {
 	inputname = argv[1];
 
 	if ( !argv[2] ) {
-		outputname = "resultados/output.txt";
+		outputname = "results/output.txt";
 	} else {
 		outputname = argv[2];
 	}
@@ -196,7 +206,7 @@ int main ( int argc, char *argv[] ) {
 		Inicializa a instancia. 
 		Executa o algoritmo e calcula do custo da solucao. 
 	*/
-	distances 	= load_instance ( inputname, n_cities ); 
+	distances 	= load_instance ( inputname, n_cities );
 	int *solution = run ( distances, n_cities, n_cities ); 
 	int cost = calculate_pathcost ( distances, solution, n_cities ); 
 
@@ -246,8 +256,8 @@ int calculate_pathcost ( int *distances, int *path, int n_cities ) {
 int *best_solution ( int *tours, int *distances, int n_ants, int n_cities ) {
 	int *best_tour = &tours[0];
 	for (int tour = 0; tour < n_ants; tour++) 
-		if ( calculate_pathcost ( distances, &tours[tour], n_cities ) < calculate_pathcost ( distances, best_tour, n_cities ) ) 
-			best_tour = &tours[tour];
+		if (calculate_pathcost(distances, &tours[index(n_cities, tour, 0)], n_cities) < calculate_pathcost(distances, best_tour, n_cities)) 
+			best_tour = &tours[index(n_cities, tour, 0)];
 	return best_tour;
 }
 
@@ -268,6 +278,7 @@ void reinforce ( double *pheromones, int *distances, int *min_path, int n_cities
 }
 
 void construct_tour ( int *distances, double *pheromones, double *choiceinfo, int *tour, int *visited, int step, int n_cities ) { 
+
 	/* 
 		Cidade atual. 
 	*/
@@ -291,36 +302,29 @@ void construct_tour ( int *distances, double *pheromones, double *choiceinfo, in
 			Se a cidade ja foi visitada, atribui-se probabilidade 0. 
 		*/
 		if ( visited[i] == 1 ) 
-			neighbour_probs[i] = 0.0f;
+			neighbour_probs[i] = 0;
 		else {
 			double current_prob = choiceinfo[ index(n_cities, current, i) ]; 
 			neighbour_probs[i] 	= current_prob; 
 			sum_probs += current_prob; 
 		}
 	}
-	
-	/*
-		Normaliza a probabilidade entre 0.0 e 1.0. 
-	*/
-	for (int i = 0; i < n_cities; i++) 
-		neighbour_probs[i] /= sum_probs;
 
 	/*
-		Seleciona um numero aleatorio entre 0.0f e 1.0f. 
+		Seleciona um numero aleatorio entre 0.0f e sum_probs. 
 	*/
-	double random = randdouble();
+	double random = randdouble() * sum_probs;
 	
 	/*
 		Indice da proxima a cidade a ser visitada
 	*/
-	int next 	= 0; 
-	double sum 	= neighbour_probs[0]; 
+	int next; 
+	double sum = neighbour_probs[0]; 
 	/*
 		Aplica a selecao por roulette wheel. 
 	*/
-	while ( sum < random ) {
-		next++; 
-		sum += neighbour_probs[next];
+	for (next = 0; sum < random; next++) {
+		sum += neighbour_probs[next + 1];
 	} 
 	
 	/*
@@ -344,15 +348,19 @@ int *run ( int *distances, int n_cities, int n_ants) {
 
 	/*
 		Instancia-se a matriz de solucoes. 
-		Inicialmente, todas as posicoes encontram-se no infinito. 
 	*/
-	int tours[ n_ants * n_cities ];
-
-	for (int i = 0; i <  n_ants; i++) 
-		for (int j = 0; j < n_cities; j++) 
-			tours[ index(n_cities, i, j) ] = Infinity; 
+	int * tours = (int*) malloc( n_ants * n_cities * sizeof(int) );
 
 	for (int iteration = 0; iteration < NUMBER_OF_ITERATIONS; iteration++) { 
+		/*
+			Reseta todos os caminhos ao inicio de cada iteracao. 
+			Inicialmente, todas as posicoes encontram-se no infinito. 
+		*/
+
+		for (int i = 0; i <  n_ants; i++) 
+			for (int j = 0; j < n_cities; j++) 
+				tours[ index(n_cities, i, j) ] = Infinity; 
+
 		/*
 			Calcula o numerador da funcao de probabilidade. 
 			Em cada iteracao, este valor eh o mesmo para cada formiga, o que encoraja sua execucao aqui, 
@@ -367,7 +375,8 @@ int *run ( int *distances, int n_cities, int n_ants) {
 				if ( edge_weight != 0.0f ) {
 					prob = pow ( edge_pherom, ALFA ) * pow ( (1/edge_weight), BETA ); 
 				} else {
-					prob = pow ( edge_pherom, ALFA ); 
+					prob = pow ( edge_pherom, ALFA ) * pow ( Infinity, BETA ); 
+					//prob = 1.0f;
 				} 
 				choiceinfo[index(n_cities, i, j)] = prob; 
 			} 
@@ -376,7 +385,7 @@ int *run ( int *distances, int n_cities, int n_ants) {
 			int step = 0;
 			/* 
 				Informa as cidades ja visitadas pela formiga. 
-				Para cidade, o valor eh 1 se a cidade ja foi visitada, e 0, caso contrario. 
+				Para cada cidade, o valor eh 1 se a cidade ja foi visitada, e 0, caso contrario. 
 				Incialmente, todas as posicoes sao 0. 
 			*/
 			int visited[ n_cities ]; 
@@ -395,7 +404,7 @@ int *run ( int *distances, int n_cities, int n_ants) {
 			int init = rand() % n_cities;
 
 			tour[step] = init;
-			visited[init] = 1;
+			visited[init] = 1;		
 
 			for (step = 1; step < n_cities; step++) 
 				construct_tour ( distances, pheromones, choiceinfo, tour, visited, step, n_cities ); 
