@@ -48,11 +48,14 @@
 
 using namespace std;
 
-const int NUMBER_OF_ITERATIONS = 50;
+const int NUMBER_OF_ITERATIONS = 100;
 const double INIT_PHEROMONE_AMOUNT = 1.0;
 const double EVAPORATION_RATE = 0.5;
 const double ALFA = 1; /* Influencia da trilha de feromonios */
 const double BETA = 2; /* Influencia da informacao heuristica */
+
+int threads ( int n_ants );
+int thread_per_block ( int n_ants );
 
 /* 
 	load_instance()
@@ -191,7 +194,7 @@ int main ( int argc, char *argv[] ) {
 		Executa o algoritmo e calcula do custo da solucao. 
 	*/
 	distances 	= load_instance ( inputname, n_cities );
-	int *solution = run ( distances, n_cities, 128 ); 
+	int *solution = run ( distances, n_cities, threads ( n_cities ) ); 
 	int cost = calculate_pathcost ( distances, solution, n_cities ); 
 
 	cout << "Writing results in file " << outputname << "!\n";
@@ -227,17 +230,8 @@ __global__ void cuda_reinforce ( double *pheromones, int *distances, int *path, 
 
 __global__ void cuda_construct_tour (int *tours, int *visited, double *choiceinfo, double *probs, int n_cities ) {
 
-	//int line_id = blockIdx.x; 
 	int line_id = blockDim.x * blockIdx.x + threadIdx.x; 
-	
-	//extern __shared__ int shared_visited[]; 
 
-	//for(int i = 0; i < n_cities; i++) {
-		//shared_visited[ index ( n_cities, line_id, i ) ] = visited[ index ( n_cities, line_id, i ) ];
-	//} 
-
-	// __syncthreads();
-	
 	for (int step = 1; step < n_cities; step++) { 
 
 		int current = tours[ index ( n_cities, line_id, step - 1 ) ];
@@ -255,7 +249,7 @@ __global__ void cuda_construct_tour (int *tours, int *visited, double *choiceinf
 
 		double random;
 		curandState_t state;
-		curand_init ( (unsigned long long) clock(), 0, 0, &state );
+		curand_init ( (unsigned long long) clock(), 0, 0, &state ); 
 		random = curand_uniform ( &state ); 
 		random *= sum_probs; 
 
@@ -268,7 +262,22 @@ __global__ void cuda_construct_tour (int *tours, int *visited, double *choiceinf
 
 		tours[ index ( n_cities, line_id, step ) ] = next; 
 		visited[ index ( n_cities, line_id, next) ] = 1; 
-	} 	
+	} 
+}
+
+int threads ( int n_ants ) {
+	int n_threds = 1;
+
+	while ( n_threds * 2 < n_ants ) {
+		n_threds *= 2;
+	}
+
+	return n_threds;
+}
+
+int thread_per_block ( int n_ants ) {
+	int blocks = log(n_ants); 
+	return pow (2, blocks);
 }
 
 int *load_instance ( char const *filename, int &n_cities ) {
@@ -444,11 +453,12 @@ int *run ( int *distances, int n_cities, int n_ants) {
 		cudaMemcpy ( visited_device, visited, tours_size, cudaMemcpyHostToDevice ); 
 		cudaMemcpy ( tours_device, tours, tours_size, cudaMemcpyHostToDevice ); 
 
-		int blockDim = 8;
-		int antsPerBlock = n_ants / blockDim;
-		// int sharedMemorySize = n_ants * n_cities * sizeof(int);
-		
-		cuda_construct_tour <<< blockDim, antsPerBlock/*, sharedMemorySize */>>> ( tours_device, visited_device, choiceinfo_device, probs, n_cities ); 
+		int gridDim = n_ants / thread_per_block (n_ants);
+		int antsPerBlock = thread_per_block (n_ants); 
+
+		//cuda_construct_tour <<< gridDim, antsPerBlock, tours_size >>> ( tours_device, visited_device, choiceinfo_device, probs, n_cities ); 
+
+		cuda_construct_tour <<< 1, n_ants >>> ( tours_device, visited_device, choiceinfo_device, probs, n_cities ); 
 
 		cudaMemcpy ( tours, tours_device, tours_size, cudaMemcpyDeviceToHost ); 
 		cudaMemcpy ( visited, visited_device, tours_size, cudaMemcpyDeviceToHost );	
