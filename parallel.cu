@@ -456,9 +456,9 @@ int *run ( int *distances, int n_cities, int n_ants) {
 		int gridDim = n_ants / thread_per_block (n_ants);
 		int antsPerBlock = thread_per_block (n_ants); 
 
-		//cuda_construct_tour <<< gridDim, antsPerBlock, tours_size >>> ( tours_device, visited_device, choiceinfo_device, probs, n_cities ); 
+		cuda_construct_tour <<< gridDim, antsPerBlock >>> ( tours_device, visited_device, choiceinfo_device, probs, n_cities ); 
 
-		cuda_construct_tour <<< 1, n_ants >>> ( tours_device, visited_device, choiceinfo_device, probs, n_cities ); 
+		//cuda_construct_tour <<< 1, n_ants >>> ( tours_device, visited_device, choiceinfo_device, probs, n_cities ); 
 
 		cudaMemcpy ( tours, tours_device, tours_size, cudaMemcpyDeviceToHost ); 
 		cudaMemcpy ( visited, visited_device, tours_size, cudaMemcpyDeviceToHost );	
